@@ -62,6 +62,7 @@
     
     let px = 0;
     let py = 100;
+    let driftingAsterisks = [];
     
     let isEnterDown = false;
     let keyLock = false; // Prevents holding enter from instantly restarting
@@ -150,6 +151,17 @@
             let ay = Math.floor(Math.random() * 180) + 10;
             offscreenCtx.fillText('*', ax, ay);
         }
+
+        driftingAsterisks = [];
+        const numDrifters = Math.floor(level / 2); // 1 at L2, 2 at L4, etc.
+        
+        for (let i = 0; i < numDrifters; i++) {
+            driftingAsterisks.push({
+                x: Math.floor(Math.random() * 200) + 50, // Keep away from start
+                y: Math.floor(Math.random() * 180) + 10,
+                vy: (Math.random() > 0.5 ? 0.5 : -0.5)   // Move up or down by 0.5px per tick
+            });
+        }
     }
 
     function updatePhysics() {
@@ -176,6 +188,20 @@
         if (pixelData[0] > 50 || pixelData[1] > 50 || pixelData[2] > 50) {
             gameOver();
             return;
+        }
+
+        for (let a of driftingAsterisks) {
+            a.y += a.vy;
+            
+            // Bounce off the top and bottom borders
+            if (a.y <= 5 || a.y >= 195) a.vy *= -1;
+            
+            // Mathematical collision check (Bounding box)
+            // If the player gets within ~5 pixels of the center of a red asterisk, CRASH!
+            if (Math.abs(px - a.x) < 5 && Math.abs(py - a.y) < 5) {
+                gameOver();
+                return;
+            }
         }
 
         // Draw Player Pixel to offscreen canvas (leaves a trail)
@@ -215,6 +241,17 @@
         // 2. Scale and draw offscreen canvas to display canvas
         displayCtx.imageSmoothingEnabled = false; 
         displayCtx.drawImage(offscreenCanvas, 0, 0, 900, 600);
+
+        displayCtx.save();
+        displayCtx.scale(3, 3); // Scale 3x to match the internal game coordinate system
+        displayCtx.font = 'bold 12px "Courier New"';
+        displayCtx.textBaseline = 'middle';
+        displayCtx.fillStyle = 'red';
+        
+        for (let a of driftingAsterisks) {
+            displayCtx.fillText('*', a.x, a.y);
+        }
+        displayCtx.restore(); // Undo the 3x scale for the rest of the UI text
 
         // 3. Draw UI overlays
         displayCtx.fillStyle = 'white';
