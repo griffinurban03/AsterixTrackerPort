@@ -151,8 +151,11 @@
 
         // Pixel-perfect collision detection
         const pixelData = offscreenCtx.getImageData(px, py, 1, 1).data;
-        // If pixel is not black (RGB > 0), it's a crash
-        if (pixelData[0] !== 0 || pixelData[1] !== 0 || pixelData[2] !== 0) {
+        
+        // FIX: Use a > 50 threshold instead of strict non-zero limits. 
+        // Modern P3 color-space monitors often render "black" on canvas as [1, 1, 1] internally.
+        // This threshold safely triggers on white/yellow objects while ignoring color profile noise.
+        if (pixelData[0] > 50 || pixelData[1] > 50 || pixelData[2] > 50) {
             gameOver();
             return;
         }
@@ -237,8 +240,12 @@
 
     function gameLoop(timestamp) {
         if (!lastTime) lastTime = timestamp;
-        const delta = timestamp - lastTime;
+        let delta = timestamp - lastTime;
         lastTime = timestamp;
+
+        // FIX: Prevent "Spiral of Death". If the user switches tabs and comes back, 
+        // the delta will be massive and instantly teleport the player into a border. 
+        if (delta > 100) delta = tickInterval;
 
         if (currentState === GAME_STATES.PLAYING) {
             accumulator += delta;
