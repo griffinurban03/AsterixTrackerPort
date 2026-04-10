@@ -91,6 +91,13 @@
         }
     });
 
+    function getPlayerColor(currentLevel) {
+        if (currentLevel < 5) return 'yellow';      // Levels 1-4: Classic Yellow
+        if (currentLevel < 10) return '#39FF14';    // Levels 5-9: Neon Green
+        if (currentLevel < 15) return '#00FFFF';    // Levels 10-14: Cyan
+        return '#FF00FF';                           // Levels 15+: Hot Pink
+    }   
+
     // --- Game Logic ---
     function startGame() {
         level = 1;
@@ -167,7 +174,7 @@
         }
 
         // Draw Player Pixel to offscreen canvas (leaves a trail)
-        offscreenCtx.fillStyle = 'yellow';
+        offscreenCtx.fillStyle = getPlayerColor(level); // Dynamic color based on level
         offscreenCtx.fillRect(px, py, 1, 1);
     }
 
@@ -221,7 +228,7 @@
             displayCtx.font = 'bold 48px "Courier New"';
             displayCtx.fillText("ASTERISK", 450, 250);
             displayCtx.font = 'bold 24px "Courier New"';
-            displayCtx.fillStyle = 'yellow';
+            displayCtx.fillStyle = getPlayerColor(level);
             displayCtx.fillText("Press ENTER to Start", 450, 320);
         } 
         else if (currentState === GAME_STATES.GAMEOVER) {
@@ -232,7 +239,7 @@
             displayCtx.fillText("GAME OVER", 450, 280);
             displayCtx.font = 'bold 24px "Courier New"';
             displayCtx.fillText(`Died on Level ${level}`, 450, 330);
-            displayCtx.fillStyle = 'yellow';
+            displayCtx.fillStyle = getPlayerColor(level);
             displayCtx.fillText("Press ENTER to Restart", 450, 380);
         }
         else if (currentState === GAME_STATES.TRANSITION) {
