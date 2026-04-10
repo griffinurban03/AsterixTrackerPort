@@ -125,14 +125,19 @@
         offscreenCtx.fillRect(0, 199, 300, 1);   // Bottom
         
         // Calculate a random gap position.
-        // Canvas height is 200, gap is 30px. 
-        // We want the top of the gap to be anywhere between y=10 and y=160.
-        const gapTop = Math.floor(Math.random() * 150) + 10;
-        const gapBottom = gapTop + 30;
+        // Calculate the gap size: starts at 30, shrinks by 1 per level, minimum 8px.
+        const gapSize = Math.max(8, 31 - level);
+        
+        // Calculate max gapTop to ensure the gap doesn't draw off the bottom edge
+        const maxGapTop = 190 - gapSize; 
+        
+        // Randomize the vertical position of the gap within safe bounds
+        const gapTop = Math.floor(Math.random() * (maxGapTop - 10)) + 10;
+        const gapBottom = gapTop + gapSize;
 
-        // Right edge with dynamic 30px gap
-        offscreenCtx.fillRect(299, 0, 1, gapTop);                         // Top wall
-        offscreenCtx.fillRect(299, gapBottom, 1, 200 - gapBottom);        // Bottom wall
+        // Draw the Right edge with our dynamically sized and positioned gap
+        offscreenCtx.fillRect(299, 0, 1, gapTop);                  // Top wall
+        offscreenCtx.fillRect(299, gapBottom, 1, 200 - gapBottom); // Bottom wall
 
         // 3. Draw Asterisks
         offscreenCtx.font = 'bold 12px "Courier New"';
