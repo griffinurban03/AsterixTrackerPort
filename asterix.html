@@ -122,8 +122,8 @@
 
         // 2. Draw Borders (White)
         offscreenCtx.fillStyle = 'white';
-        offscreenCtx.fillRect(0, 0, 300, 1);     // Top
-        offscreenCtx.fillRect(0, 199, 300, 1);   // Bottom
+        //offscreenCtx.fillRect(0, 0, 300, 1);     // Top
+        //offscreenCtx.fillRect(0, 199, 300, 1);   // Bottom
         
         // Calculate a random gap position.
         // Calculate the gap size: starts at 30, shrinks by 1 per level, minimum 8px.
@@ -173,6 +173,9 @@
         }
         px += 1; // Advance forward
 
+        if (py < 0) py = 199;        // Off the top -> wrap to bottom
+        else if (py > 199) py = 0;   // Off the bottom -> wrap to top
+
         // Check level completion BEFORE collision (survived the 299 right border)
         if (px >= 300) {
             levelComplete();
@@ -194,7 +197,8 @@
             a.y += a.vy;
             
             // Bounce off the top and bottom borders
-            if (a.y <= 5 || a.y >= 195) a.vy *= -1;
+            if (a.y < 0) a.y = 199;
+            else if (a.y > 199) a.y = 0;
             
             // Mathematical collision check (Bounding box)
             // If the player gets within ~5 pixels of the center of a red asterisk, CRASH!
