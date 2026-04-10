@@ -117,9 +117,15 @@
         offscreenCtx.fillRect(0, 0, 300, 1);     // Top
         offscreenCtx.fillRect(0, 199, 300, 1);   // Bottom
         
-        // Right edge with 30px gap at vertical center (85 to 115)
-        offscreenCtx.fillRect(299, 0, 1, 85);
-        offscreenCtx.fillRect(299, 115, 1, 85);
+        // Calculate a random gap position.
+        // Canvas height is 200, gap is 30px. 
+        // We want the top of the gap to be anywhere between y=10 and y=160.
+        const gapTop = Math.floor(Math.random() * 150) + 10;
+        const gapBottom = gapTop + 30;
+
+        // Right edge with dynamic 30px gap
+        offscreenCtx.fillRect(299, 0, 1, gapTop);                         // Top wall
+        offscreenCtx.fillRect(299, gapBottom, 1, 200 - gapBottom);        // Bottom wall
 
         // 3. Draw Asterisks
         offscreenCtx.font = 'bold 12px "Courier New"';
