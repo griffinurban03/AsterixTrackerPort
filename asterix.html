@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Asterisk - HTML5 Port</title>
+    <style>
+        body {
+            background-color: #111;
+            color: #eee;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            font-family: 'Courier New', Courier, monospace;
+            overflow: hidden;
+        }
+        #game-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        /* The on-screen display canvas, scaled up 3x from the 300x200 internal resolution */
+        canvas {
+            background-color: #000;
+            border: 2px solid #444;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.8);
+            image-rendering: pixelated; /* Ensures sharp scaling */
+        }
+        p {
+            margin-top: 15px;
+            color: #888;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="displayCanvas" width="900" height="600"></canvas>
+    <p>Hold [ENTER] to rise, Release to fall. Navigate the gap.</p>
+</div>
+
+<script>
+    // --- Canvas & Rendering Setup ---
+    const displayCanvas = document.getElementById('displayCanvas');
+    const displayCtx = displayCanvas.getContext('2d');
+    
+    // Offscreen canvas for 1:1 pixel rendering and perfect collision detection
+    const offscreenCanvas = document.createElement('canvas');
+    offscreenCanvas.width = 300;
+    offscreenCanvas.height = 200;
+    const offscreenCtx = offscreenCanvas.getContext('2d', { willReadFrequently: true });
+
+    // --- Game State Variables ---
+    const GAME_STATES = { START: 0, PLAYING: 1, TRANSITION: 2, GAMEOVER: 3 };
+    let currentState = GAME_STATES.START;
+    
+    let level = 1;
+    let highScore = localStorage.getItem('asteriskHighScore') || 1;
+    
+    let px = 0;
+    let py = 100;
+    
+    let isEnterDown = false;
+    let keyLock = false; // Prevents holding enter from instantly restarting
+    
+    // Time tracking for ~50FPS fixed timestep
+    let lastTime = 0;
+    let accumulator = 0;
+    let tickInterval = 20; // 20ms = 50 FPS
+
+    // --- Input Handling ---
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            isEnterDown = true;
+            
+            if (currentState === GAME_STATES.START) {
+                startGame();
+            } else if (currentState === GAME_STATES.GAMEOVER && !keyLock) {
+                startGame();
+            }
+        }
+    });
+
+    window.addEventListener('keyup', (e) => {
+        if (e.key === 'Enter') {
+            isEnterDown = false;
+            keyLock = false; // Unlock restart ability once key is released
+        }
+    });
+
+    // --- Game Logic ---
+    function startGame() {
+        level = 1;
+        tickInterval = 20; 
+        loadLevel();
+        currentState = GAME_STATES.PLAYING;
+    }
+
+    function loadLevel() {
+        px = 0;
+        py = 100; // Vertical center
+        
+        // Difficulty Ramp: Increase speed starting at level 5
+        if (level >= 5) {
+            tickInterval = Math.max(10, 20 - (level - 4)); // Reduces interval by 1ms per level, floor at 10ms
+        }
+
+        // 1. Clear offscreen canvas
+        offscreenCtx.fillStyle = 'black';
+        offscreenCtx.fillRect(0, 0, 300, 200);
+
+        // 2. Draw Borders (White)
+        offscreenCtx.fillStyle = 'white';
+        offscreenCtx.fillRect(0, 0, 300, 1);     // Top
+        offscreenCtx.fillRect(0, 199, 300, 1);   // Bottom
+        
+        // Right edge with 30px gap at vertical center (85 to 115)
+        offscreenCtx.fillRect(299, 0, 1, 85);
+        offscreenCtx.fillRect(299, 115, 1, 85);
+
+        // 3. Draw Asterisks
+        offscreenCtx.font = 'bold 12px "Courier New"';
+        offscreenCtx.textBaseline = 'top';
+        const numAsterisks = level * 3;
+        
+        for (let i = 0; i < numAsterisks; i++) {
+            // Keep away from the absolute start to give player a moment
+            let ax = Math.floor(Math.random() * 250) + 30; 
+            let ay = Math.floor(Math.random() * 180) + 10;
+            offscreenCtx.fillText('*', ax, ay);
+        }
+    }
+
+    function updatePhysics() {
+        // Player Movement
+        if (isEnterDown) {
+            py -= 1; // Rise
+        } else {
+            py += 1; // Fall
+        }
+        px += 1; // Advance forward
+
+        // Check level completion BEFORE collision (survived the 299 right border)
+        if (px >= 300) {
+            levelComplete();
+            return;
+        }
+
+        // Pixel-perfect collision detection
+        const pixelData = offscreenCtx.getImageData(px, py, 1, 1).data;
+        // If pixel is not black (RGB > 0), it's a crash
+        if (pixelData[0] !== 0 || pixelData[1] !== 0 || pixelData[2] !== 0) {
+            gameOver();
+            return;
+        }
+
+        // Draw Player Pixel to offscreen canvas (leaves a trail)
+        offscreenCtx.fillStyle = 'yellow';
+        offscreenCtx.fillRect(px, py, 1, 1);
+    }
+
+    function levelComplete() {
+        currentState = GAME_STATES.TRANSITION;
+        if (level > highScore) {
+            highScore = level;
+            localStorage.setItem('asteriskHighScore', highScore);
+        }
+        
+        setTimeout(() => {
+            level++;
+            loadLevel();
+            currentState = GAME_STATES.PLAYING;
+        }, 1000); // 1 second pause
+    }
+
+    function gameOver() {
+        currentState = GAME_STATES.GAMEOVER;
+        keyLock = true; // Force player to release and repress Enter to restart
+        if (level > highScore) {
+            highScore = level;
+            localStorage.setItem('asteriskHighScore', highScore);
+        }
+    }
+
+    // --- Rendering Loop ---
+    function renderDisplay() {
+        // 1. Clear Display Canvas
+        displayCtx.fillStyle = 'black';
+        displayCtx.fillRect(0, 0, displayCanvas.width, displayCanvas.height);
+
+        // 2. Scale and draw offscreen canvas to display canvas
+        displayCtx.imageSmoothingEnabled = false; 
+        displayCtx.drawImage(offscreenCanvas, 0, 0, 900, 600);
+
+        // 3. Draw UI overlays
+        displayCtx.fillStyle = 'white';
+        displayCtx.font = 'bold 24px "Courier New"';
+        displayCtx.textAlign = 'left';
+        displayCtx.fillText(`LEVEL: ${level}`, 20, 30);
+        
+        displayCtx.textAlign = 'right';
+        displayCtx.fillText(`HIGH SCORE: ${highScore}`, 880, 30);
+
+        displayCtx.textAlign = 'center';
+        if (currentState === GAME_STATES.START) {
+            displayCtx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            displayCtx.fillRect(0, 0, 900, 600);
+            displayCtx.fillStyle = 'white';
+            displayCtx.font = 'bold 48px "Courier New"';
+            displayCtx.fillText("ASTERISK", 450, 250);
+            displayCtx.font = 'bold 24px "Courier New"';
+            displayCtx.fillStyle = 'yellow';
+            displayCtx.fillText("Press ENTER to Start", 450, 320);
+        } 
+        else if (currentState === GAME_STATES.GAMEOVER) {
+            displayCtx.fillStyle = 'rgba(255, 0, 0, 0.3)';
+            displayCtx.fillRect(0, 0, 900, 600);
+            displayCtx.fillStyle = 'white';
+            displayCtx.font = 'bold 48px "Courier New"';
+            displayCtx.fillText("GAME OVER", 450, 280);
+            displayCtx.font = 'bold 24px "Courier New"';
+            displayCtx.fillText(`Died on Level ${level}`, 450, 330);
+            displayCtx.fillStyle = 'yellow';
+            displayCtx.fillText("Press ENTER to Restart", 450, 380);
+        }
+        else if (currentState === GAME_STATES.TRANSITION) {
+            displayCtx.fillStyle = 'rgba(0, 255, 0, 0.2)';
+            displayCtx.fillRect(0, 0, 900, 600);
+            displayCtx.fillStyle = 'white';
+            displayCtx.font = 'bold 48px "Courier New"';
+            displayCtx.fillText(`LEVEL ${level} COMPLETE!`, 450, 300);
+        }
+    }
+
+    function gameLoop(timestamp) {
+        if (!lastTime) lastTime = timestamp;
+        const delta = timestamp - lastTime;
+        lastTime = timestamp;
+
+        if (currentState === GAME_STATES.PLAYING) {
+            accumulator += delta;
+            // Update physics in fixed timesteps
+            while (accumulator >= tickInterval) {
+                updatePhysics();
+                accumulator -= tickInterval;
+                // If state changes mid-tick, break out of loop
+                if (currentState !== GAME_STATES.PLAYING) break; 
+            }
+        }
+
+        renderDisplay();
+        requestAnimationFrame(gameLoop);
+    }
+
+    // Start Loop
+    requestAnimationFrame(gameLoop);
+</script>
+</body>
+</html>
